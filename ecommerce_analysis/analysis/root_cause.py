@@ -11,7 +11,7 @@ from utils.data_processor import (
     merge_user_orders,
     pct_change,
 )
-from utils.i18n import ATTR_DIM_LABELS, LANG_ZH, t
+from utils.i18n import ATTR_DIM_LABELS, LANG_ZH, get_lang, t
 from utils.llm_client import call_deepseek, load_prompt
 
 
@@ -125,8 +125,9 @@ def run_root_cause(
     users: pd.DataFrame,
     anomaly_result: dict[str, Any],
     use_llm: bool = True,
-    lang: str = LANG_ZH,
+    lang: str | None = None,
 ) -> dict[str, Any]:
+    lang = lang or get_lang()
     _, _, cur_label, prev_label = _month_slices(orders, users)
     drill_tables = drill_down(orders, users)
     merged = merge_user_orders(users, orders)

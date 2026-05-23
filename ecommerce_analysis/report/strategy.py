@@ -3,15 +3,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from utils.i18n import LANG_ZH, t
+from utils.i18n import LANG_ZH, get_lang, t
 from utils.llm_client import call_deepseek, load_prompt
 
 
 def generate_strategy(
     root_cause_result: dict[str, Any],
     metrics_summary: str = "",
-    lang: str = LANG_ZH,
+    lang: str | None = None,
 ) -> str:
+    lang = lang or get_lang()
     prompt_tpl = load_prompt("strategy_prompt.txt", lang)
     data = {
         "metrics_summary": metrics_summary,

@@ -9,7 +9,7 @@ import streamlit as st
 from config import MAX_UPLOAD_SIZE_MB
 from data.data_definitions import empty_template_df, get_template_dfs
 from utils.data_processor import validate_upload
-from utils.i18n import LANG_ZH, column_docs, t
+from utils.i18n import get_lang, t
 
 
 def _csv_download(df: pd.DataFrame, filename: str) -> bytes:
@@ -17,7 +17,7 @@ def _csv_download(df: pd.DataFrame, filename: str) -> bytes:
 
 
 def render_upload_sidebar() -> dict | None:
-    lang = st.session_state.get("lang", LANG_ZH)
+    lang = get_lang()
     st.sidebar.header(t("upload.header", lang))
     st.sidebar.caption(t("upload.caption", lang, max_mb=MAX_UPLOAD_SIZE_MB))
 
@@ -67,7 +67,7 @@ def render_upload_sidebar() -> dict | None:
     products = pd.read_csv(io.BytesIO(fp.getvalue()))
     orders = pd.read_csv(io.BytesIO(fo.getvalue()))
 
-    result = validate_upload(users, products, orders, lang=lang)
+    result = validate_upload(users, products, orders)
     if result["ok"]:
         st.sidebar.success(t("upload.validation_ok", lang))
         for w in result.get("warnings", []):

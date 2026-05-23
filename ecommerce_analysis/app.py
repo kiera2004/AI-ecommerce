@@ -28,18 +28,21 @@ from ui.display import (
     show_strategy,
 )
 from ui.upload import render_upload_sidebar
-from utils.i18n import render_language_selector, t
+from utils.i18n import LANG_ZH, render_language_selector, t
 
 load_dotenv()
 
-lang = render_language_selector()
+if "lang" not in st.session_state:
+    st.session_state.lang = LANG_ZH
 
 st.set_page_config(
-    page_title=t("app.page_title", lang),
+    page_title=t("app.page_title", st.session_state.lang),
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+lang = render_language_selector()
 
 st.title(t("app.title", lang))
 st.caption(t("app.caption", lang))
@@ -55,14 +58,13 @@ if validated and st.sidebar.button(t("btn.run_analysis", lang), type="primary", 
         products = validated["products"]
         orders = validated["orders"]
 
-        metrics = compute_all_metrics(users, products, orders, lang=lang)
-        anomaly = run_anomaly_analysis(metrics, orders, lang=lang)
+        metrics = compute_all_metrics(users, products, orders)
+        anomaly = run_anomaly_analysis(metrics, orders)
         root = run_root_cause(
             orders,
             users,
             anomaly,
             use_llm=bool(os.getenv("DEEPSEEK_API_KEY")),
-            lang=lang,
         )
 
         strategy = ""
@@ -70,12 +72,10 @@ if validated and st.sidebar.button(t("btn.run_analysis", lang), type="primary", 
         if os.getenv("DEEPSEEK_API_KEY"):
             try:
                 with st.spinner(t("spinner.strategy", lang)):
-                    strategy = generate_strategy(
-                        root, metrics_summary=str(metrics.get("metrics_flat", "")), lang=lang
-                    )
+                    strategy = generate_strategy(root, metrics_summary=str(metrics.get("metrics_flat", "")))
                 with st.spinner(t("spinner.report", lang)):
                     ctx = build_report_context(metrics, anomaly, root, strategy)
-                    report = generate_growth_report(ctx, lang=lang)
+                    report = generate_growth_report(ctx)
             except Exception as e:
                 strategy = t("report.strategy_failed", lang, err=e)
                 report = t("report.report_failed", lang, err=e)
@@ -83,7 +83,6 @@ if validated and st.sidebar.button(t("btn.run_analysis", lang), type="primary", 
             strategy = t("report.no_api", lang)
             report = report_to_markdown(
                 t("report.no_api_summary", lang) + "\n\n" + "\n".join(anomaly.get("month_anomalies", [])),
-                lang=lang,
             )
 
         st.session_state.update(
@@ -94,7 +93,7 @@ if validated and st.sidebar.button(t("btn.run_analysis", lang), type="primary", 
                 "anomaly": anomaly,
                 "root": root,
                 "strategy": strategy,
-                "report_md": report_to_markdown(report if report.startswith("#") else report, lang=lang),
+                "report_md": report_to_markdown(report if report.startswith("#") else report),
             }
         )
 

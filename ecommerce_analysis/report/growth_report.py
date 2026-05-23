@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from utils.i18n import LANG_ZH, t
+from utils.i18n import LANG_ZH, get_lang, t
 from utils.llm_client import call_deepseek, load_prompt
 
 
@@ -25,13 +25,15 @@ def build_report_context(
     }
 
 
-def generate_growth_report(context: dict[str, Any], lang: str = LANG_ZH) -> str:
+def generate_growth_report(context: dict[str, Any], lang: str | None = None) -> str:
+    lang = lang or get_lang()
     prompt_tpl = load_prompt("report_prompt.txt", lang)
     system = prompt_tpl.format(data=str(context))
     return call_deepseek(system, t("llm.report_user", lang), lang=lang)
 
 
-def report_to_markdown(report_text: str, lang: str = LANG_ZH) -> str:
+def report_to_markdown(report_text: str, lang: str | None = None) -> str:
+    lang = lang or get_lang()
     title = t("report.title_md", lang)
     return f"# {title}\n\n{report_text}\n"
 

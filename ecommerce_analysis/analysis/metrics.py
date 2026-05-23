@@ -14,7 +14,7 @@ from utils.data_processor import (
     pct_change,
     wow_mom_change,
 )
-from utils.i18n import LANG_EN, LANG_ZH, metric_labels, t
+from utils.i18n import LANG_EN, LANG_ZH, get_lang, metric_labels, t
 
 # Backward-compatible exports (Chinese defaults)
 USER_METRIC_LABELS = metric_labels("user", LANG_ZH)
@@ -228,8 +228,9 @@ def compute_all_metrics(
     users: pd.DataFrame,
     products: pd.DataFrame,
     orders: pd.DataFrame,
-    lang: str = LANG_ZH,
+    lang: str | None = None,
 ) -> dict[str, Any]:
+    lang = lang or get_lang()
     base = compute_period_metrics(users, products, orders)
 
     user_w_cur = _cluster_metrics(base["week"]["current"], users)

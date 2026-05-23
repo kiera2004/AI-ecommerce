@@ -459,22 +459,34 @@ def localize_cohort_table(df: pd.DataFrame, lang: str = LANG_ZH) -> pd.DataFrame
   return df.rename(columns={k: v for k, v in mapping.items() if k in df.columns})
 
 
+def get_lang() -> str:
+  """Read current UI language from Streamlit session (fallback: zh)."""
+  try:
+    import streamlit as st
+
+    return st.session_state.get("lang", LANG_ZH)
+  except Exception:
+    return LANG_ZH
+
+
 def render_language_selector() -> str:
   """Sidebar language selector; returns current lang code."""
   import streamlit as st
 
-  options = {LANG_ZH: t("settings.lang_zh", LANG_ZH), LANG_EN: t("settings.lang_en", LANG_EN)}
   if "lang" not in st.session_state:
     st.session_state.lang = LANG_ZH
 
-  selected = st.sidebar.selectbox(
+  options = [LANG_ZH, LANG_EN]
+  labels = {LANG_ZH: t("settings.lang_zh", LANG_ZH), LANG_EN: t("settings.lang_en", LANG_EN)}
+
+  st.sidebar.selectbox(
     t("settings.language", st.session_state.lang),
-    options=list(options.keys()),
-    format_func=lambda k: options[k],
-    key="lang_selector",
+    options=options,
+    format_func=lambda k: labels[k],
+    key="lang",
   )
-  if selected != st.session_state.lang:
-    st.session_state.lang = selected
-    if st.session_state.get("analysis_done") and st.session_state.get("analysis_lang") != selected:
-      st.sidebar.warning(t("settings.rerun_hint", selected))
+
+  if st.session_state.get("analysis_done") and st.session_state.get("analysis_lang") != st.session_state.lang:
+    st.sidebar.warning(t("settings.rerun_hint", st.session_state.lang))
+
   return st.session_state.lang

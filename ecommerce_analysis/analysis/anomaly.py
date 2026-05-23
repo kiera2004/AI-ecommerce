@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from config import ANOMALY_THRESHOLD
-from utils.i18n import LANG_ZH, all_metric_labels, scope_label, t
+from utils.i18n import LANG_ZH, all_metric_labels, get_lang, scope_label, t
 
 
 def _is_anomaly(change_pct: float, threshold: float = ANOMALY_THRESHOLD) -> bool:
@@ -31,11 +31,12 @@ def _format_anomaly_line(row: pd.Series, lang: str = LANG_ZH) -> str:
     )
 
 
-def detect_anomalies(metrics_result: dict[str, Any], lang: str = LANG_ZH) -> dict[str, Any]:
+def detect_anomalies(metrics_result: dict[str, Any], lang: str | None = None) -> dict[str, Any]:
     """
     异动仅基于 metrics_flat（整体汇总层，每个 scope+period+metric 唯一）。
     不再从细分对比表逐行扫描，避免同一指标出现多个不同百分比。
     """
+    lang = lang or get_lang()
     flat = metrics_result.get("metrics_flat", pd.DataFrame())
     week_lines: list[str] = []
     month_lines: list[str] = []
@@ -55,7 +56,8 @@ def detect_anomalies(metrics_result: dict[str, Any], lang: str = LANG_ZH) -> dic
     }
 
 
-def monitor_trends(orders: pd.DataFrame, cohort: pd.DataFrame, lang: str = LANG_ZH) -> dict[str, Any]:
+def monitor_trends(orders: pd.DataFrame, cohort: pd.DataFrame, lang: str | None = None) -> dict[str, Any]:
+    lang = lang or get_lang()
     texts: list[str] = []
     figures: list[go.Figure] = []
 
@@ -114,8 +116,9 @@ def monitor_trends(orders: pd.DataFrame, cohort: pd.DataFrame, lang: str = LANG_
 def run_anomaly_analysis(
     metrics_result: dict[str, Any],
     orders: pd.DataFrame,
-    lang: str = LANG_ZH,
+    lang: str | None = None,
 ) -> dict[str, Any]:
+    lang = lang or get_lang()
     anomalies = detect_anomalies(metrics_result, lang)
     trends = monitor_trends(orders, metrics_result.get("cohort", pd.DataFrame()), lang)
     return {**anomalies, **trends}

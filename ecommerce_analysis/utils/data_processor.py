@@ -8,7 +8,7 @@ import pandas as pd
 
 from config import REQUIRED_ORDER_MONTHS
 from data.data_definitions import ORDER_COLUMNS, PRODUCT_COLUMNS, USER_COLUMNS
-from utils.i18n import LANG_ZH, t
+from utils.i18n import LANG_ZH, get_lang, t
 
 
 def _check_columns(df: pd.DataFrame, expected: dict, name: str, lang: str = LANG_ZH) -> list[str]:
@@ -46,7 +46,8 @@ def parse_orders(orders: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def validate_three_month_span(orders: pd.DataFrame, lang: str = LANG_ZH) -> tuple[bool, str]:
+def validate_three_month_span(orders: pd.DataFrame, lang: str | None = None) -> tuple[bool, str]:
+    lang = lang or get_lang()
     if orders.empty:
         return False, t("val.orders_empty", lang)
     dates = orders["order_date"]
@@ -77,8 +78,9 @@ def validate_upload(
     users: pd.DataFrame,
     products: pd.DataFrame,
     orders: pd.DataFrame,
-    lang: str = LANG_ZH,
+    lang: str | None = None,
 ) -> dict[str, Any]:
+    lang = lang or get_lang()
     errors: list[str] = []
     warnings: list[str] = []
 
