@@ -16,7 +16,8 @@ def _csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False).encode("utf-8-sig")
 
 
-def render_upload_sidebar(lang: str = LANG_ZH) -> dict | None:
+def render_upload_sidebar() -> dict | None:
+    lang = st.session_state.get("lang", LANG_ZH)
     st.sidebar.header(t("upload.header", lang))
     st.sidebar.caption(t("upload.caption", lang, max_mb=MAX_UPLOAD_SIZE_MB))
 

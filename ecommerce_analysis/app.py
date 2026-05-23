@@ -44,7 +44,7 @@ st.set_page_config(
 st.title(t("app.title", lang))
 st.caption(t("app.caption", lang))
 
-validated = render_upload_sidebar(lang)
+validated = render_upload_sidebar()
 
 if "analysis_done" not in st.session_state:
     st.session_state.analysis_done = False
