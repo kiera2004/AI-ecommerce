@@ -6,7 +6,6 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from config import CAC_ASSUMPTION
 from utils.data_processor import (
     channel_retention,
     compute_period_metrics,
@@ -15,38 +14,12 @@ from utils.data_processor import (
     pct_change,
     wow_mom_change,
 )
+from utils.i18n import LANG_EN, LANG_ZH, metric_labels, t
 
-# 各层面指标中文名（用于展示表标题）
-USER_METRIC_LABELS = {
-    "share": "用户占比",
-    "active_users": "活跃用户数",
-    "avg_discount": "平均折扣率",
-    "avg_rating": "平均评分",
-    "return_rate": "退货率",
-    "churn_risk": "流失风险",
-}
-
-PRODUCT_METRIC_LABELS = {
-    "revenue": "品类营收",
-    "orders": "品类销量",
-    "aov": "客单价",
-    "return_rate": "退货率",
-    "avg_rating": "平均评分",
-    "avg_discount": "平均折扣率",
-}
-
-CHANNEL_METRIC_LABELS = {
-    "new_users": "新用户数",
-    "first_order_aov": "首单AOV",
-    "repurchase_rate": "复购率",
-    "ltv": "LTV",
-    "cac_estimated": "CAC估算",
-    "roi_ltv_cac": "ROI(LTV/CAC)",
-    "churn_rate": "流失率",
-    "avg_rating": "平均评分",
-    "retention_7d": "7日留存率",
-    "retention_30d": "30日留存率",
-}
+# Backward-compatible exports (Chinese defaults)
+USER_METRIC_LABELS = metric_labels("user", LANG_ZH)
+PRODUCT_METRIC_LABELS = metric_labels("product", LANG_ZH)
+CHANNEL_METRIC_LABELS = metric_labels("channel", LANG_ZH)
 
 
 def _safe_mean(s: pd.Series) -> float:
@@ -149,31 +122,26 @@ def _compare_frames(cur: pd.DataFrame, prev: pd.DataFrame, key: str, metrics: li
 def split_metric_tables(
     compare_df: pd.DataFrame,
     dimension_col: str,
-    metric_labels: dict[str, str],
-    period_label: str,
+    labels: dict[str, str],
+    period_key: str,
+    lang: str = LANG_ZH,
 ) -> list[dict[str, Any]]:
     """按指标拆分为多张表，每张表仅含 dimension + cur + prev + change_pct。"""
     tables: list[dict[str, Any]] = []
     if compare_df is None or compare_df.empty:
         return tables
 
-    for metric, label in metric_labels.items():
+    period_title = t(f"period.{period_key}", lang)
+    for metric, label in labels.items():
         cur_c, prev_c, pct_c = f"{metric}_cur", f"{metric}_prev", f"{metric}_change_pct"
         if cur_c not in compare_df.columns:
             continue
         tbl = compare_df[[dimension_col, cur_c, prev_c, pct_c]].copy()
-        tbl = tbl.rename(
-            columns={
-                cur_c: f"{metric}_cur",
-                prev_c: f"{metric}_prev",
-                pct_c: f"{metric}_change_pct",
-            }
-        )
         tables.append(
             {
-                "title": f"{label}（{period_label}）",
+                "title": f"{label} ({period_title})" if lang == LANG_EN else f"{label}（{period_title}）",
                 "metric": metric,
-                "period_label": period_label,
+                "period_key": period_key,
                 "dimension_col": dimension_col,
                 "data": tbl,
             }
@@ -194,6 +162,7 @@ def build_metrics_flat(
     prod_m: pd.DataFrame,
     ch_w: pd.DataFrame,
     ch_m: pd.DataFrame,
+    lang: str = LANG_ZH,
 ) -> pd.DataFrame:
     """仅汇总整体层级指标，供异动检测（每个 scope+period+metric 唯一一行）。"""
     flat: list[dict] = []
@@ -211,9 +180,9 @@ def build_metrics_flat(
             }
         )
 
-    user_metrics = list(USER_METRIC_LABELS.keys())
-    product_metrics = list(PRODUCT_METRIC_LABELS.keys())
-    channel_metrics = list(CHANNEL_METRIC_LABELS.keys())
+    user_metrics = list(metric_labels("user", lang).keys())
+    product_metrics = list(metric_labels("product", lang).keys())
+    channel_metrics = list(metric_labels("channel", lang).keys())
 
     for period, u_df, p_df, c_df in [
         ("week", user_w, prod_w, ch_w),
@@ -255,7 +224,12 @@ def build_metrics_flat(
     return pd.DataFrame(flat)
 
 
-def compute_all_metrics(users: pd.DataFrame, products: pd.DataFrame, orders: pd.DataFrame) -> dict[str, Any]:
+def compute_all_metrics(
+    users: pd.DataFrame,
+    products: pd.DataFrame,
+    orders: pd.DataFrame,
+    lang: str = LANG_ZH,
+) -> dict[str, Any]:
     base = compute_period_metrics(users, products, orders)
 
     user_w_cur = _cluster_metrics(base["week"]["current"], users)
@@ -273,9 +247,12 @@ def compute_all_metrics(users: pd.DataFrame, products: pd.DataFrame, orders: pd.
     ch_m_cur = _channel_metrics(base["month"]["current"], users, orders)
     ch_m_prev = _channel_metrics(base["month"]["prev"], users, orders)
 
-    user_metrics = list(USER_METRIC_LABELS.keys())
-    product_metrics = list(PRODUCT_METRIC_LABELS.keys())
-    channel_metrics = list(CHANNEL_METRIC_LABELS.keys())
+    user_lbl = metric_labels("user", lang)
+    product_lbl = metric_labels("product", lang)
+    channel_lbl = metric_labels("channel", lang)
+    user_metrics = list(user_lbl.keys())
+    product_metrics = list(product_lbl.keys())
+    channel_metrics = list(channel_lbl.keys())
 
     user_week = _compare_frames(user_w_cur, user_w_prev, "cluster", user_metrics)
     user_month = _compare_frames(user_m_cur, user_m_prev, "cluster", user_metrics)
@@ -284,37 +261,38 @@ def compute_all_metrics(users: pd.DataFrame, products: pd.DataFrame, orders: pd.
     ch_week = _compare_frames(ch_w_cur, ch_w_prev, "acquisition_channel", channel_metrics)
     ch_month = _compare_frames(ch_m_cur, ch_m_prev, "acquisition_channel", channel_metrics)
 
-    metrics_flat = build_metrics_flat(user_week, user_month, prod_week, prod_month, ch_week, ch_month)
+    metrics_flat = build_metrics_flat(user_week, user_month, prod_week, prod_month, ch_week, ch_month, lang)
 
     return {
         "periods": base["periods"],
         "user": {
             "week": user_week,
             "month": user_month,
-            "week_tables": split_metric_tables(user_week, "cluster", USER_METRIC_LABELS, "周对比"),
-            "month_tables": split_metric_tables(user_month, "cluster", USER_METRIC_LABELS, "月对比"),
+            "week_tables": split_metric_tables(user_week, "cluster", user_lbl, "week", lang),
+            "month_tables": split_metric_tables(user_month, "cluster", user_lbl, "month", lang),
         },
         "product": {
             "week": prod_week,
             "month": prod_month,
-            "week_tables": split_metric_tables(prod_week, "category", PRODUCT_METRIC_LABELS, "周对比"),
-            "month_tables": split_metric_tables(prod_month, "category", PRODUCT_METRIC_LABELS, "月对比"),
+            "week_tables": split_metric_tables(prod_week, "category", product_lbl, "week", lang),
+            "month_tables": split_metric_tables(prod_month, "category", product_lbl, "month", lang),
         },
         "channel": {
             "week": ch_week,
             "month": ch_month,
-            "week_tables": split_metric_tables(ch_week, "acquisition_channel", CHANNEL_METRIC_LABELS, "周对比"),
-            "month_tables": split_metric_tables(ch_month, "acquisition_channel", CHANNEL_METRIC_LABELS, "月对比"),
-            "cac_assumption": CAC_ASSUMPTION,
+            "week_tables": split_metric_tables(ch_week, "acquisition_channel", channel_lbl, "week", lang),
+            "month_tables": split_metric_tables(ch_month, "acquisition_channel", channel_lbl, "month", lang),
+            "cac_assumption": t("cac.assumption", lang),
         },
         "cohort": base["cohort"],
         "metrics_flat": metrics_flat,
         "products_table": products,
         "metric_labels": {
-            "user": USER_METRIC_LABELS,
-            "product": PRODUCT_METRIC_LABELS,
-            "channel": CHANNEL_METRIC_LABELS,
+            "user": user_lbl,
+            "product": product_lbl,
+            "channel": channel_lbl,
         },
+        "lang": lang,
     }
 
 

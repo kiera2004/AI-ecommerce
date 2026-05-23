@@ -1,0 +1,11 @@
+You are an ecommerce data analytics expert. Perform root-cause reasoning from the data below.
+
+Data (MoM revenue drill-down by dimension):
+{data}
+
+Requirements:
+1. Focus on latest full month vs prior month revenue changes across user segments, channels, countries, categories, and products
+2. Propose hypotheses across marketing/acquisition, product/operations, user behavior, and external factors
+3. Build validation chains using drill-down data and rule-based attribution
+4. Identify the 2–3 most likely root causes with supporting evidence
+5. Write in English with clear structure

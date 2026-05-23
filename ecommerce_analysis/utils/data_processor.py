@@ -8,16 +8,17 @@ import pandas as pd
 
 from config import REQUIRED_ORDER_MONTHS
 from data.data_definitions import ORDER_COLUMNS, PRODUCT_COLUMNS, USER_COLUMNS
+from utils.i18n import LANG_ZH, t
 
 
-def _check_columns(df: pd.DataFrame, expected: dict, name: str) -> list[str]:
+def _check_columns(df: pd.DataFrame, expected: dict, name: str, lang: str = LANG_ZH) -> list[str]:
     errors: list[str] = []
     missing = set(expected) - set(df.columns)
     extra = set(df.columns) - set(expected)
     if missing:
-        errors.append(f"{name} 缺少列: {sorted(missing)}")
+        errors.append(t("val.missing_cols", lang, name=name, cols=sorted(missing)))
     if extra:
-        errors.append(f"{name} 多余列: {sorted(extra)}")
+        errors.append(t("val.extra_cols", lang, name=name, cols=sorted(extra)))
     return errors
 
 
@@ -45,15 +46,18 @@ def parse_orders(orders: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def validate_three_month_span(orders: pd.DataFrame) -> tuple[bool, str]:
+def validate_three_month_span(orders: pd.DataFrame, lang: str = LANG_ZH) -> tuple[bool, str]:
     if orders.empty:
-        return False, "订单表为空"
+        return False, t("val.orders_empty", lang)
     dates = orders["order_date"]
     months = sorted({(d.year, d.month) for d in dates})
     if len(months) != REQUIRED_ORDER_MONTHS:
-        return False, (
-            f"订单日期须恰好覆盖 {REQUIRED_ORDER_MONTHS} 个连续自然月，"
-            f"当前检测到 {len(months)} 个月: {months}"
+        return False, t(
+            "val.month_span",
+            lang,
+            required=REQUIRED_ORDER_MONTHS,
+            found=len(months),
+            months=months,
         )
     for i in range(1, len(months)):
         y1, m1 = months[i - 1]
@@ -61,15 +65,19 @@ def validate_three_month_span(orders: pd.DataFrame) -> tuple[bool, str]:
         expected_m = m1 + 1 if m1 < 12 else 1
         expected_y = y1 if m1 < 12 else y1 + 1
         if (y2, m2) != (expected_y, expected_m):
-            return False, f"月份不连续: {months}"
-    span = f"{months[0][0]}-{months[0][1]:02d} 至 {months[-1][0]}-{months[-1][1]:02d}"
-    return True, f"日期范围校验通过，覆盖 {span}"
+            return False, t("val.month_gap", lang, months=months)
+    if lang == LANG_ZH:
+        span = f"{months[0][0]}-{months[0][1]:02d} 至 {months[-1][0]}-{months[-1][1]:02d}"
+    else:
+        span = f"{months[0][0]}-{months[0][1]:02d} to {months[-1][0]}-{months[-1][1]:02d}"
+    return True, t("val.span_ok", lang, span=span)
 
 
 def validate_upload(
     users: pd.DataFrame,
     products: pd.DataFrame,
     orders: pd.DataFrame,
+    lang: str = LANG_ZH,
 ) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -79,7 +87,7 @@ def validate_upload(
         (products, PRODUCT_COLUMNS, "products"),
         (orders, ORDER_COLUMNS, "orders"),
     ]:
-        errors.extend(_check_columns(df, schema, name))
+        errors.extend(_check_columns(df, schema, name, lang))
 
     if errors:
         return {"ok": False, "errors": errors, "warnings": warnings}
@@ -88,7 +96,7 @@ def validate_upload(
     products_c = _coerce_types(products, PRODUCT_COLUMNS)
     orders_c = parse_orders(orders)
 
-    ok_span, span_msg = validate_three_month_span(orders_c)
+    ok_span, span_msg = validate_three_month_span(orders_c, lang)
     if not ok_span:
         errors.append(span_msg)
     else:
@@ -98,10 +106,10 @@ def validate_upload(
     user_ids = set(users_c["customer_id"])
     orphan = order_users - user_ids
     if orphan:
-        warnings.append(f"订单中有 {len(orphan)} 个 customer_id 不在用户表")
+        warnings.append(t("val.orphan_users", lang, count=len(orphan)))
 
     if not set(users_c["churned"].unique()).issubset({0, 1}):
-        errors.append("users.churned 必须为 0 或 1")
+        errors.append(t("val.churned", lang))
 
     return {
         "ok": len(errors) == 0,

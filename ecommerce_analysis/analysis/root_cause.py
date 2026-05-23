@@ -11,6 +11,7 @@ from utils.data_processor import (
     merge_user_orders,
     pct_change,
 )
+from utils.i18n import ATTR_DIM_LABELS, LANG_ZH, t
 from utils.llm_client import call_deepseek, load_prompt
 
 
@@ -60,7 +61,6 @@ def drill_down(orders: pd.DataFrame, users: pd.DataFrame) -> dict[str, pd.DataFr
             continue
 
         m = cur.merge(prev, on=dims, how="outer", suffixes=("_cur", "_prev")).fillna(0)
-        m = m.rename(columns={"revenue_cur": "revenue_cur", "revenue_prev": "revenue_prev"})
         m["revenue_change"] = m["revenue_cur"] - m["revenue_prev"]
         m["revenue_change_pct"] = m.apply(
             lambda r: pct_change(r["revenue_cur"], r["revenue_prev"]), axis=1
@@ -77,14 +77,15 @@ def rule_based_attribution(
     merged: pd.DataFrame,
     cur_label: str,
     prev_label: str,
+    lang: str = LANG_ZH,
 ) -> list[str]:
-    chains: list[str] = [f"对比周期：{prev_label} → {cur_label}（营收维度）"]
+    chains: list[str] = [t("attr.compare_period", lang, prev=prev_label, cur=cur_label)]
 
-    for dim, label in [
-        ("channel", "渠道"),
-        ("category", "品类"),
-        ("cluster", "用户分层"),
-        ("country", "国家"),
+    for dim, dim_key in [
+        ("channel", "channel"),
+        ("category", "category"),
+        ("cluster", "cluster"),
+        ("country", "country"),
     ]:
         if dim not in drill_tables or drill_tables[dim].empty:
             continue
@@ -94,18 +95,27 @@ def rule_based_attribution(
             "current_month", "prev_month",
         )]
         dim_val = " / ".join(str(top[c]) for c in dim_cols)
+        dim_label = ATTR_DIM_LABELS.get(dim_key, {}).get(lang, dim_key)
         chains.append(
-            f"{label}维度 [{dim_val}]：营收 {top['revenue_prev']:.2f} → {top['revenue_cur']:.2f} "
-            f"({top['revenue_change_pct']:+.1%})，变化额 {top['revenue_change']:.2f}"
+            t(
+                "attr.dim_line",
+                lang,
+                dim=dim_label,
+                val=dim_val,
+                prev=top["revenue_prev"],
+                cur=top["revenue_cur"],
+                pct=top["revenue_change_pct"],
+                change=top["revenue_change"],
+            )
         )
 
     if not merged.empty:
         disc = merged.groupby(merged["order_date"].dt.to_period("M"))["discount_rate"].mean()
         if len(disc) >= 2 and disc.iloc[-1] - disc.iloc[-2] > 0.05:
-            chains.append("验证：最近月平均折扣率上升，可能与营收/毛利波动相关。")
+            chains.append(t("attr.discount_up", lang))
         ret = merged.groupby(merged["order_date"].dt.to_period("M"))["returned"].mean()
         if len(ret) >= 2 and ret.iloc[-1] - ret.iloc[-2] > 0.03:
-            chains.append("验证：最近月退货率上升，需排查产品质量或预期管理。")
+            chains.append(t("attr.return_up", lang))
 
     return chains
 
@@ -115,16 +125,17 @@ def run_root_cause(
     users: pd.DataFrame,
     anomaly_result: dict[str, Any],
     use_llm: bool = True,
+    lang: str = LANG_ZH,
 ) -> dict[str, Any]:
     _, _, cur_label, prev_label = _month_slices(orders, users)
     drill_tables = drill_down(orders, users)
     merged = merge_user_orders(users, orders)
-    attribution = rule_based_attribution(drill_tables, merged, cur_label, prev_label)
+    attribution = rule_based_attribution(drill_tables, merged, cur_label, prev_label, lang)
 
     llm_text = ""
     if use_llm:
         try:
-            prompt_tpl = load_prompt("root_cause_prompt.txt")
+            prompt_tpl = load_prompt("root_cause_prompt.txt", lang)
             data_blob = {
                 "compare_period": f"{prev_label} vs {cur_label}",
                 "week_anomalies": anomaly_result.get("week_anomalies", []),
@@ -133,15 +144,16 @@ def run_root_cause(
                 "rule_attribution": attribution,
             }
             system = prompt_tpl.format(data=str(data_blob))
-            llm_text = call_deepseek(system, "请基于本月vs上月各维度营收下钻结果，输出根因分析结论与验证链条。")
+            llm_text = call_deepseek(system, t("llm.root_cause_user", lang), lang=lang)
         except Exception as e:
-            llm_text = f"（LLM 未调用: {e}）"
+            llm_text = t("llm.not_called", lang, err=e)
 
     return {
         "drill_down": drill_tables,
         "attribution_chains": attribution,
         "llm_analysis": llm_text,
         "compare_period": {"current": cur_label, "previous": prev_label},
+        "lang": lang,
     }
 
 

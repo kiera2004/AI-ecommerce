@@ -7,41 +7,48 @@ import pandas as pd
 import streamlit as st
 
 from config import MAX_UPLOAD_SIZE_MB
-from data.data_definitions import (
-    ORDER_COLUMN_DOCS,
-    PRODUCT_COLUMN_DOCS,
-    USER_COLUMN_DOCS,
-    empty_template_df,
-    get_template_dfs,
-)
+from data.data_definitions import empty_template_df, get_template_dfs
 from utils.data_processor import validate_upload
+from utils.i18n import LANG_ZH, column_docs, t
 
 
 def _csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False).encode("utf-8-sig")
 
 
-def render_upload_sidebar() -> dict | None:
-    st.sidebar.header("📁 数据上传")
-    st.sidebar.caption(f"单文件上限 {MAX_UPLOAD_SIZE_MB}MB，订单须覆盖连续 3 个月")
+def render_upload_sidebar(lang: str = LANG_ZH) -> dict | None:
+    st.sidebar.header(t("upload.header", lang))
+    st.sidebar.caption(t("upload.caption", lang, max_mb=MAX_UPLOAD_SIZE_MB))
 
-    st.sidebar.subheader("下载模板")
+    st.sidebar.subheader(t("upload.download_templates", lang))
     c1, c2, c3 = st.sidebar.columns(3)
-    u_tpl, p_tpl, o_tpl = get_template_dfs()
     with c1:
-        st.download_button("用户", _csv_download(empty_template_df("users"), "users.csv"), "users_template.csv")
+        st.download_button(
+            t("upload.users", lang),
+            _csv_download(empty_template_df("users"), "users.csv"),
+            "users_template.csv",
+        )
     with c2:
-        st.download_button("产品", _csv_download(empty_template_df("products"), "products.csv"), "products_template.csv")
+        st.download_button(
+            t("upload.products", lang),
+            _csv_download(empty_template_df("products"), "products.csv"),
+            "products_template.csv",
+        )
     with c3:
-        st.download_button("订单", _csv_download(empty_template_df("orders"), "orders.csv"), "orders_template.csv")
+        st.download_button(
+            t("upload.orders", lang),
+            _csv_download(empty_template_df("orders"), "orders.csv"),
+            "orders_template.csv",
+        )
 
-    with st.sidebar.expander("📖 上传说明", expanded=False):
-        st.markdown("### 用户表 users.csv")
-        st.markdown(USER_COLUMN_DOCS)
-        st.markdown("### 产品表 products.csv")
-        st.markdown(PRODUCT_COLUMN_DOCS)
-        st.markdown("### 订单表 orders.csv")
-        st.markdown(ORDER_COLUMN_DOCS)
+    user_docs, product_docs, order_docs = column_docs(lang)
+    with st.sidebar.expander(t("upload.instructions", lang), expanded=False):
+        st.markdown(t("upload.users_table", lang))
+        st.markdown(user_docs)
+        st.markdown(t("upload.products_table", lang))
+        st.markdown(product_docs)
+        st.markdown(t("upload.orders_table", lang))
+        st.markdown(order_docs)
 
     fu = st.sidebar.file_uploader("users.csv", type=["csv"], key="users")
     fp = st.sidebar.file_uploader("products.csv", type=["csv"], key="products")
@@ -52,16 +59,16 @@ def render_upload_sidebar() -> dict | None:
 
     for f, name in [(fu, "users"), (fp, "products"), (fo, "orders")]:
         if f.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
-            st.sidebar.error(f"{name} 超过 {MAX_UPLOAD_SIZE_MB}MB")
+            st.sidebar.error(t("upload.file_too_large", lang, name=name, max_mb=MAX_UPLOAD_SIZE_MB))
             return None
 
     users = pd.read_csv(io.BytesIO(fu.getvalue()))
     products = pd.read_csv(io.BytesIO(fp.getvalue()))
     orders = pd.read_csv(io.BytesIO(fo.getvalue()))
 
-    result = validate_upload(users, products, orders)
+    result = validate_upload(users, products, orders, lang=lang)
     if result["ok"]:
-        st.sidebar.success("✅ 校验通过")
+        st.sidebar.success(t("upload.validation_ok", lang))
         for w in result.get("warnings", []):
             st.sidebar.warning(w)
     else:

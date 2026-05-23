@@ -1,0 +1,11 @@
+You are an ecommerce growth lead. Create operational strategy from the root-cause analysis.
+
+Data:
+{data}
+
+Output:
+## Short-term fixes (1–2 weeks)
+## Mid-term optimization (1–3 months)
+## Experiments (hypothesis, metrics, sample size)
+
+Be specific and actionable. Write in English.

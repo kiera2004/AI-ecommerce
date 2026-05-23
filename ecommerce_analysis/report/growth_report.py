@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from utils.i18n import LANG_ZH, t
 from utils.llm_client import call_deepseek, load_prompt
 
 
@@ -24,16 +25,14 @@ def build_report_context(
     }
 
 
-def generate_growth_report(context: dict[str, Any]) -> str:
-    prompt_tpl = load_prompt("report_prompt.txt")
+def generate_growth_report(context: dict[str, Any], lang: str = LANG_ZH) -> str:
+    prompt_tpl = load_prompt("report_prompt.txt", lang)
     system = prompt_tpl.format(data=str(context))
-    return call_deepseek(
-        system,
-        "请生成完整增长报告，包含：核心摘要、问题陈述、根因分析、策略建议、下周关注指标。",
-    )
+    return call_deepseek(system, t("llm.report_user", lang), lang=lang)
 
 
-def report_to_markdown(report_text: str, title: str = "电商增长分析报告") -> str:
+def report_to_markdown(report_text: str, lang: str = LANG_ZH) -> str:
+    title = t("report.title_md", lang)
     return f"# {title}\n\n{report_text}\n"
 
 
@@ -46,7 +45,6 @@ def export_simple_pdf_bytes(md: str, title: str = "Growth Report") -> bytes:
     try:
         from io import BytesIO
 
-        # 最小 PDF 1.4 单页文本
         lines = [title, ""] + md.split("\n")
         content = "BT /F1 10 Tf 50 750 Td "
         for i, line in enumerate(lines[:60]):
@@ -73,5 +71,5 @@ def export_simple_pdf_bytes(md: str, title: str = "Growth Report") -> bytes:
 
 
 if __name__ == "__main__":
-    ctx = build_report_context({}, {"week_anomalies": []}, {"attribution_chains": []}, "策略占位")
+    ctx = build_report_context({}, {"week_anomalies": []}, {"attribution_chains": []}, "placeholder")
     print("Context keys:", ctx.keys())
