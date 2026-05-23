@@ -7,13 +7,25 @@ import pandas as pd
 import streamlit as st
 
 from config import MAX_UPLOAD_SIZE_MB
-from data.data_definitions import empty_template_df, get_template_dfs
+from data.data_definitions import (
+    ORDER_COLUMN_DOCS,
+    PRODUCT_COLUMN_DOCS,
+    USER_COLUMN_DOCS,
+    empty_template_df,
+)
 from utils.data_processor import validate_upload
-from utils.i18n import get_lang, t
+from utils.i18n import column_docs, get_lang, t
 
 
 def _csv_download(df: pd.DataFrame, filename: str) -> bytes:
     return df.to_csv(index=False).encode("utf-8-sig")
+
+
+def _get_column_docs(lang: str) -> tuple[str, str, str]:
+    try:
+        return column_docs(lang)
+    except (KeyError, TypeError):
+        return USER_COLUMN_DOCS, PRODUCT_COLUMN_DOCS, ORDER_COLUMN_DOCS
 
 
 def render_upload_sidebar() -> dict | None:
@@ -42,7 +54,11 @@ def render_upload_sidebar() -> dict | None:
             "orders_template.csv",
         )
 
-    user_docs, product_docs, order_docs = column_docs(lang)
+    fu = st.sidebar.file_uploader("users.csv", type=["csv"], key="users")
+    fp = st.sidebar.file_uploader("products.csv", type=["csv"], key="products")
+    fo = st.sidebar.file_uploader("orders.csv", type=["csv"], key="orders")
+
+    user_docs, product_docs, order_docs = _get_column_docs(lang)
     with st.sidebar.expander(t("upload.instructions", lang), expanded=False):
         st.markdown(t("upload.users_table", lang))
         st.markdown(user_docs)
@@ -50,10 +66,6 @@ def render_upload_sidebar() -> dict | None:
         st.markdown(product_docs)
         st.markdown(t("upload.orders_table", lang))
         st.markdown(order_docs)
-
-    fu = st.sidebar.file_uploader("users.csv", type=["csv"], key="users")
-    fp = st.sidebar.file_uploader("products.csv", type=["csv"], key="products")
-    fo = st.sidebar.file_uploader("orders.csv", type=["csv"], key="orders")
 
     if not (fu and fp and fo):
         return None
